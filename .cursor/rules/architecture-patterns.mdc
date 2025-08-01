@@ -1,0 +1,511 @@
+# DESWEAL Architecture Patterns
+
+## Clean Architecture Principles
+
+### Layer Separation
+1. **Domain Layer** (Business Logic)
+   - Entities: Pure business objects
+   - Repositories: Abstract interfaces
+   - Use Cases: Business operations
+   - No dependencies on external frameworks
+
+2. **Data Layer** (Data Access)
+   - Repository implementations
+   - Data sources (Firebase, Local)
+   - Data models (JSON serialization)
+   - Mappers between domain and data models
+
+3. **Presentation Layer** (UI)
+   - Bloc/Cubit for state management
+   - Screens and widgets
+   - UI logic and user interactions
+
+## State Management Patterns
+
+### Bloc Pattern
+```dart
+// Event-driven state management for complex features
+class WealthBloc extends Bloc<WealthEvent, WealthState> {
+  WealthBloc(this._repository) : super(WealthInitial()) {
+    on<LoadTransactions>(_onLoadTransactions);
+    on<AddTransaction>(_onAddTransaction);
+  }
+}
+```
+
+### Cubit Pattern
+```dart
+// Simple state management for basic features
+class ThemeCubit extends Cubit<ThemeState> {
+  ThemeCubit() : super(ThemeState.dark());
+  
+  void toggleTheme() => emit(state.copyWith(isDark: !state.isDark));
+}
+```
+
+## Repository Pattern
+```dart
+// Abstract repository interface
+abstract class WealthRepository {
+  Future<List<Transaction>> getTransactions();
+  Future<void> addTransaction(Transaction transaction);
+  Future<void> updateTransaction(Transaction transaction);
+  Future<void> deleteTransaction(String id);
+}
+
+// Implementation with Firebase
+class WealthRepositoryImpl implements WealthRepository {
+  final FirebaseFirestore _firestore;
+  
+  WealthRepositoryImpl(this._firestore);
+  
+  @override
+  Future<List<Transaction>> getTransactions() async {
+    // Implementation
+  }
+}
+```
+
+## Dependency Injection
+```dart
+// Using get_it for service locator
+@module
+abstract class AppModule {
+  @lazySingleton
+  WealthRepository get wealthRepository => WealthRepositoryImpl(get<FirebaseFirestore>());
+  
+  @lazySingleton
+  WealthBloc get wealthBloc => WealthBloc(get<WealthRepository>());
+}
+```
+
+## Error Handling Patterns
+
+### Result Pattern
+```dart
+sealed class Result<T> {
+  const Result();
+}
+
+class Success<T> extends Result<T> {
+  final T data;
+  const Success(this.data);
+}
+
+class Failure<T> extends Result<T> {
+  final String message;
+  const Failure(this.message);
+}
+```
+
+### Exception Handling
+```dart
+class AppException implements Exception {
+  final String message;
+  final String? code;
+  
+  const AppException(this.message, {this.code});
+}
+
+// Usage in repositories
+try {
+  // Firebase operation
+} on FirebaseException catch (e) {
+  throw AppException(e.message ?? 'Firebase error', code: e.code);
+}
+```
+
+## Navigation Patterns
+
+### GoRouter Configuration
+```dart
+final router = GoRouter(
+  initialLocation: '/',
+  routes: [
+    // Auth Flow
+    GoRoute(
+      path: '/login',
+      builder: (context, state) => const LoginScreen(),
+    ),
+    GoRoute(
+      path: '/register', 
+      builder: (context, state) => const RegisterScreen(),
+    ),
+    
+    // Main App Flow (Shell Route)
+    ShellRoute(
+      builder: (context, state, child) => MainLayout(child: child),
+      routes: [
+        // Dashboard
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const HomeScreen(),
+        ),
+        
+        // Transactions
+        GoRoute(
+          path: '/transactions',
+          builder: (context, state) => const TransactionsScreen(),
+        ),
+        GoRoute(
+          path: '/add-transaction',
+          builder: (context, state) => const AddTransactionScreen(),
+        ),
+        
+        // Goals
+        GoRoute(
+          path: '/goals',
+          builder: (context, state) => const GoalsScreen(),
+        ),
+        GoRoute(
+          path: '/add-goal',
+          builder: (context, state) => const AddGoalScreen(),
+        ),
+        
+        // Insights
+        GoRoute(
+          path: '/insights',
+          builder: (context, state) => const InsightsScreen(),
+        ),
+        
+        // Settings
+        GoRoute(
+          path: '/settings',
+          builder: (context, state) => const SettingsScreen(),
+        ),
+      ],
+    ),
+  ],
+);
+```
+
+### MainLayout with Bottom Navigation
+```dart
+class MainLayout extends StatelessWidget {
+  final Widget child;
+  
+  const MainLayout({super.key, required this.child});
+  
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: child,
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        currentIndex: _getCurrentIndex(context),
+        onTap: (index) => _onTabTapped(context, index),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Dashboard',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.receipt_long),
+            label: 'Transactions',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.flag),
+            label: 'Goals',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.insights),
+            label: 'Insights',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Settings',
+          ),
+        ],
+      ),
+      floatingActionButton: _buildFAB(context),
+    );
+  }
+  
+  Widget? _buildFAB(BuildContext context) {
+    final location = GoRouterState.of(context).location;
+    
+    // Show FAB only on main screens
+    if (location == '/' || location == '/transactions') {
+      return FloatingActionButton(
+        onPressed: () => context.go('/add-transaction'),
+        child: const Icon(Icons.add),
+      );
+    }
+    return null;
+  }
+}
+```
+
+### Navigation Helpers
+```dart
+class NavigationHelpers {
+  // Screen transitions
+  static void goToHome(BuildContext context) => context.go('/');
+  static void goToTransactions(BuildContext context) => context.go('/transactions');
+  static void goToAddTransaction(BuildContext context) => context.go('/add-transaction');
+  static void goToGoals(BuildContext context) => context.go('/goals');
+  static void goToInsights(BuildContext context) => context.go('/insights');
+  static void goToSettings(BuildContext context) => context.go('/settings');
+  
+  // Parameterized transitions
+  static void goToTransactionDetails(BuildContext context, String transactionId) {
+    context.go('/transaction/$transactionId');
+  }
+  
+  static void goToGoalDetails(BuildContext context, String goalId) {
+    context.go('/goal/$goalId');
+  }
+  
+  // Modal transitions
+  static void showAddTransactionModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => const AddTransactionModal(),
+    );
+  }
+}
+```
+
+### Protected Routes with Auth Guard
+```dart
+class AuthGuard {
+  static String? redirect(BuildContext context, GoRouterState state) {
+    final isLoggedIn = AuthBloc.of(context).state.isAuthenticated;
+    final isAuthRoute = state.matchedLocation == '/login' || 
+                       state.matchedLocation == '/register';
+    
+    if (!isLoggedIn && !isAuthRoute) {
+      return '/login';
+    }
+    
+    if (isLoggedIn && isAuthRoute) {
+      return '/';
+    }
+    
+    return null;
+  }
+}
+
+// Usage in router
+final router = GoRouter(
+  redirect: AuthGuard.redirect,
+  // ... other settings
+);
+```
+
+### Deep Linking for Notifications
+```dart
+final router = GoRouter(
+  initialLocation: '/',
+  routes: [
+    // ... main routes
+    
+    // Deep links for notifications
+    GoRoute(
+      path: '/notification/:type/:id',
+      builder: (context, state) {
+        final type = state.pathParameters['type']!;
+        final id = state.pathParameters['id']!;
+        
+        switch (type) {
+          case 'transaction':
+            return TransactionDetailsScreen(transactionId: id);
+          case 'goal':
+            return GoalDetailsScreen(goalId: id);
+          default:
+            return const HomeScreen();
+        }
+      },
+    ),
+  ],
+);
+```
+
+### Custom Transitions
+```dart
+class SlideTransition extends CustomTransitionPage<void> {
+  SlideTransition({required Widget child}) : super(child: child);
+  
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: const Offset(1.0, 0.0),
+        end: Offset.zero,
+      ).animate(animation),
+      child: child,
+    );
+  }
+}
+
+// Usage in router
+GoRoute(
+  path: '/add-transaction',
+  pageBuilder: (context, state) => SlideTransition(
+    child: const AddTransactionScreen(),
+  ),
+),
+```
+
+### Navigation from Bloc
+```dart
+class WealthBloc extends Bloc<WealthEvent, WealthState> {
+  final WealthRepository _repository;
+  final NavigationService _navigationService;
+  
+  WealthBloc(this._repository, this._navigationService) : super(WealthInitial()) {
+    on<TransactionAdded>(_onTransactionAdded);
+  }
+  
+  void _onTransactionAdded(TransactionAdded event, Emitter<WealthState> emit) {
+    // After adding transaction
+    _navigationService.goToTransactions();
+  }
+}
+```
+
+## Testing Patterns
+
+### Unit Tests
+```dart
+group('WealthBloc', () {
+  late WealthBloc bloc;
+  late MockWealthRepository mockRepository;
+  
+  setUp(() {
+    mockRepository = MockWealthRepository();
+    bloc = WealthBloc(mockRepository);
+  });
+  
+  test('emits [WealthLoading, WealthLoaded] when LoadTransactions is added', () {
+    // Test implementation
+  });
+});
+```
+
+### Widget Tests
+```dart
+testWidgets('TransactionList displays transactions', (tester) async {
+  await tester.pumpWidget(
+    BlocProvider(
+      create: (context) => WealthBloc(mockRepository),
+      child: const TransactionList(),
+    ),
+  );
+  
+  expect(find.byType(TransactionListItem), findsWidgets);
+});
+```
+
+## Code Organization
+
+### File Naming Conventions
+- **Entities**: `transaction.dart`, `wealth_scheme.dart`
+- **Models**: `transaction_model.dart`, `wealth_scheme_model.dart`
+- **Repositories**: `wealth_repository.dart`, `wealth_repository_impl.dart`
+- **Blocs**: `wealth_bloc.dart`, `wealth_event.dart`, `wealth_state.dart`
+- **Screens**: `home_screen.dart`, `add_transaction_screen.dart`, `login_screen.dart`
+- **Widgets**: `transaction_list.dart`, `balance_summary.dart`
+- **Pages**: `main_layout.dart`, `auth_layout.dart` (только для layout компонентов)
+
+### Import Organization
+```dart
+// Dart imports
+import 'dart:async';
+import 'dart:io';
+
+// Flutter imports
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+// Third-party imports
+import 'package:firebase_core/firebase_core.dart';
+import 'package:get_it/get_it.dart';
+
+// Local imports
+import '../../domain/entities/transaction.dart';
+import '../../domain/repositories/wealth_repository.dart';
+```
+
+## Performance Patterns
+
+### Const Constructors
+```dart
+class TransactionListItem extends StatelessWidget {
+  const TransactionListItem({
+    super.key,
+    required this.transaction,
+  });
+  
+  final Transaction transaction;
+  
+  @override
+  Widget build(BuildContext context) {
+    return const Card(
+      child: ListTile(
+        // Widget content
+      ),
+    );
+  }
+}
+```
+
+### Lazy Loading
+```dart
+class TransactionList extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      itemCount: transactions.length,
+      itemBuilder: (context, index) {
+        return TransactionListItem(
+          transaction: transactions[index],
+        );
+      },
+    );
+  }
+}
+```
+
+## Security Patterns
+
+### Data Validation
+```dart
+class TransactionValidator {
+  static String? validateAmount(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Amount is required';
+    }
+    
+    final amount = double.tryParse(value);
+    if (amount == null || amount <= 0) {
+      return 'Please enter a valid amount';
+    }
+    
+    return null;
+  }
+}
+```
+
+### Secure Storage
+```dart
+class SecureStorage {
+  static const _storage = FlutterSecureStorage();
+  
+  static Future<void> saveToken(String token) async {
+    await _storage.write(key: 'auth_token', value: token);
+  }
+  
+  static Future<String?> getToken() async {
+    return await _storage.read(key: 'auth_token');
+  }
+}
+```
+
+Refer to these patterns for consistent, maintainable, and scalable code architecture.

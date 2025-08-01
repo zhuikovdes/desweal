@@ -1,0 +1,1010 @@
+---
+alwaysApply: true
+---
+
+# Dart Best Practices & SOLID Principles
+
+## Object-Oriented Programming & SOLID Principles
+
+### Single Responsibility Principle (SRP)
+```dart
+// ✅ Good: Each class has one responsibility
+class TransactionValidator {
+  static String? validateAmount(String? value) {
+    if (value == null || value.isEmpty) return 'Amount is required';
+    final amount = double.tryParse(value);
+    if (amount == null || amount <= 0) return 'Invalid amount';
+    return null;
+  }
+}
+
+class TransactionCalculator {
+  static double calculateTotal(List<Transaction> transactions) {
+    return transactions.fold(0.0, (sum, transaction) => sum + transaction.amount);
+  }
+}
+
+// ❌ Bad: Multiple responsibilities
+class TransactionManager {
+  void validateAmount() { /* validation logic */ }
+  void calculateTotal() { /* calculation logic */ }
+  void saveToDatabase() { /* database logic */ }
+}
+```
+
+### Open/Closed Principle (OCP)
+```dart
+// ✅ Good: Open for extension, closed for modification
+abstract class PaymentMethod {
+  double calculateFee(double amount);
+}
+
+class CreditCardPayment implements PaymentMethod {
+  @override
+  double calculateFee(double amount) => amount * 0.03;
+}
+
+class BankTransferPayment implements PaymentMethod {
+  @override
+  double calculateFee(double amount) => amount * 0.01;
+}
+
+class PaymentProcessor {
+  double processPayment(PaymentMethod method, double amount) {
+    return method.calculateFee(amount);
+  }
+}
+```
+
+### Liskov Substitution Principle (LSP)
+```dart
+// ✅ Good: Subtypes are substitutable
+abstract class Repository<T> {
+  Future<List<T>> getAll();
+  Future<T?> getById(String id);
+  Future<void> save(T item);
+}
+
+class TransactionRepository implements Repository<Transaction> {
+  @override
+  Future<List<Transaction>> getAll() async {
+    // Implementation
+  }
+  
+  @override
+  Future<Transaction?> getById(String id) async {
+    // Implementation
+  }
+  
+  @override
+  Future<void> save(Transaction item) async {
+    // Implementation
+  }
+}
+```
+
+### Interface Segregation Principle (ISP)
+```dart
+// ✅ Good: Specific interfaces
+abstract class ReadableRepository<T> {
+  Future<List<T>> getAll();
+  Future<T?> getById(String id);
+}
+
+abstract class WritableRepository<T> {
+  Future<void> save(T item);
+  Future<void> delete(String id);
+}
+
+abstract class TransactionRepository extends ReadableRepository<Transaction>, WritableRepository<Transaction> {}
+
+// ❌ Bad: Fat interface
+abstract class Repository<T> {
+  Future<List<T>> getAll();
+  Future<T?> getById(String id);
+  Future<void> save(T item);
+  Future<void> delete(String id);
+  Future<void> update(T item);
+  Future<void> clear();
+  Future<int> count();
+}
+```
+
+### Dependency Inversion Principle (DIP)
+```dart
+// ✅ Good: Depend on abstractions
+class WealthBloc extends Bloc<WealthEvent, WealthState> {
+  final WealthRepository _repository; // Abstract dependency
+  
+  WealthBloc(this._repository) : super(WealthInitial());
+}
+
+// ❌ Bad: Depend on concrete implementations
+class WealthBloc extends Bloc<WealthEvent, WealthState> {
+  final FirebaseWealthRepository _repository; // Concrete dependency
+  
+  WealthBloc(this._repository) : super(WealthInitial());
+}
+```
+
+## Dart Language Best Practices
+
+### Immutability with Freezed
+```dart
+@freezed
+class Transaction with _$Transaction {
+  const factory Transaction({
+    required String id,
+    required double amount,
+    required String description,
+    required DateTime date,
+    required TransactionType type,
+    String? category,
+  }) = _Transaction;
+  
+  factory Transaction.fromJson(Map<String, dynamic> json) => _$TransactionFromJson(json);
+}
+```
+
+### Null Safety
+```dart
+// ✅ Good: Explicit null handling
+class UserProfile {
+  final String name;
+  final String? avatarUrl; // Explicit nullable
+  
+  const UserProfile({
+    required this.name,
+    this.avatarUrl,
+  });
+  
+  String get displayName => name;
+  String get avatarDisplayUrl => avatarUrl ?? 'default_avatar.png';
+}
+
+// ❌ Bad: Implicit null handling
+class UserProfile {
+  final String name;
+  final String avatarUrl; // Could be null but not marked
+  
+  const UserProfile({
+    required this.name,
+    this.avatarUrl, // Should be nullable
+  });
+}
+```
+
+### Extension Methods
+```dart
+// ✅ Good: Extend existing types
+extension DateTimeExtension on DateTime {
+  bool get isToday {
+    final now = DateTime.now();
+    return year == now.year && month == now.month && day == now.day;
+  }
+  
+  bool get isThisMonth {
+    final now = DateTime.now();
+    return year == now.year && month == now.month;
+  }
+}
+
+extension StringExtension on String {
+  double? get toDoubleOrNull => double.tryParse(this);
+  
+  bool get isValidAmount {
+    final amount = double.tryParse(this);
+    return amount != null && amount > 0;
+  }
+}
+```
+
+### Async/Await Best Practices
+```dart
+// ✅ Good: Proper error handling
+class TransactionService {
+  Future<Result<List<Transaction>>> getTransactions() async {
+    try {
+      final transactions = await _repository.getTransactions();
+      return Success(transactions);
+    } on NetworkException catch (e) {
+      return Failure('Network error: ${e.message}');
+    } on DatabaseException catch (e) {
+      return Failure('Database error: ${e.message}');
+    }
+  }
+}
+
+// ❌ Bad: Swallowing exceptions
+class TransactionService {
+  Future<List<Transaction>> getTransactions() async {
+    try {
+      return await _repository.getTransactions();
+    } catch (e) {
+      return []; // Swallowing exception
+    }
+  }
+}
+```
+
+### Collection Operations
+```dart
+// ✅ Good: Functional programming with collections
+class TransactionAnalyzer {
+  double calculateTotalIncome(List<Transaction> transactions) {
+    return transactions
+        .where((t) => t.type == TransactionType.income)
+        .map((t) => t.amount)
+        .fold(0.0, (sum, amount) => sum + amount);
+  }
+  
+  Map<String, double> groupByCategory(List<Transaction> transactions) {
+    return transactions
+        .groupBy((t) => t.category ?? 'Uncategorized')
+        .map((category, transactions) => MapEntry(
+              category,
+              transactions.map((t) => t.amount).fold(0.0, (sum, amount) => sum + amount),
+            ));
+  }
+}
+```
+
+### Const Constructors
+```dart
+// ✅ Good: Immutable widgets
+class TransactionCard extends StatelessWidget {
+  const TransactionCard({
+    super.key,
+    required this.transaction,
+    required this.onTap,
+  });
+  
+  final Transaction transaction;
+  final VoidCallback onTap;
+  
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        title: Text(transaction.description),
+        subtitle: Text(transaction.date.toString()),
+        trailing: Text('₽${transaction.amount}'),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+```
+
+### Named Parameters
+```dart
+// ✅ Good: Clear and readable
+class Transaction {
+  const Transaction({
+    required this.id,
+    required this.amount,
+    required this.description,
+    required this.date,
+    this.category,
+    this.notes,
+  });
+  
+  final String id;
+  final double amount;
+  final String description;
+  final DateTime date;
+  final String? category;
+  final String? notes;
+}
+
+// ❌ Bad: Positional parameters for complex objects
+class Transaction {
+  const Transaction(this.id, this.amount, this.description, this.date, this.category, this.notes);
+  
+  final String id;
+  final double amount;
+  final String description;
+  final DateTime date;
+  final String? category;
+  final String? notes;
+}
+```
+
+### Arrow Syntax
+```dart
+// ✅ Good: Use arrow syntax for simple functions
+class TransactionUtils {
+  static bool isValidAmount(double amount) => amount > 0;
+  
+  static String formatCurrency(double amount) => '₽${amount.toStringAsFixed(2)}';
+  
+  static DateTime getStartOfMonth(DateTime date) => DateTime(date.year, date.month, 1);
+}
+
+// ❌ Bad: Verbose syntax for simple functions
+class TransactionUtils {
+  static bool isValidAmount(double amount) {
+    return amount > 0;
+  }
+  
+  static String formatCurrency(double amount) {
+    return '₽${amount.toStringAsFixed(2)}';
+  }
+}
+```
+
+### Expression Bodies
+```dart
+// ✅ Good: Expression bodies for simple getters
+class Transaction {
+  const Transaction({
+    required this.amount,
+    required this.type,
+  });
+  
+  final double amount;
+  final TransactionType type;
+  
+  bool get isIncome => type == TransactionType.income;
+  bool get isExpense => type == TransactionType.expense;
+  String get formattedAmount => '₽${amount.toStringAsFixed(2)}';
+}
+
+// ❌ Bad: Verbose getters
+class Transaction {
+  const Transaction({
+    required this.amount,
+    required this.type,
+  });
+  
+  final double amount;
+  final TransactionType type;
+  
+  bool get isIncome {
+    return type == TransactionType.income;
+  }
+  
+  bool get isExpense {
+    return type == TransactionType.expense;
+  }
+}
+```
+
+### Trailing Commas
+```dart
+// ✅ Good: Trailing commas for better diffs
+class TransactionCard extends StatelessWidget {
+  const TransactionCard({
+    super.key,
+    required this.transaction,
+    required this.onTap,
+    this.showDetails = false,
+  });
+
+  final Transaction transaction;
+  final VoidCallback onTap;
+  final bool showDetails;
+}
+
+// ❌ Bad: No trailing commas
+class TransactionCard extends StatelessWidget {
+  const TransactionCard({
+    super.key,
+    required this.transaction,
+    required this.onTap,
+    this.showDetails = false
+  });
+
+  final Transaction transaction;
+  final VoidCallback onTap;
+  final bool showDetails;
+}
+```
+
+### Error Handling Patterns
+```dart
+// ✅ Good: Result pattern for error handling
+sealed class Result<T> {
+  const Result();
+}
+
+class Success<T> extends Result<T> {
+  final T data;
+  const Success(this.data);
+}
+
+class Failure<T> extends Result<T> {
+  final String message;
+  const Failure(this.message);
+}
+
+// Usage
+class TransactionRepository {
+  Future<Result<List<Transaction>>> getTransactions() async {
+    try {
+      final transactions = await _dataSource.getTransactions();
+      return Success(transactions);
+    } catch (e) {
+      return Failure('Failed to load transactions: $e');
+    }
+  }
+}
+```
+
+### Testing Best Practices
+```dart
+// ✅ Good: Proper test structure
+group('TransactionValidator', () {
+  test('should return null for valid amount', () {
+    final result = TransactionValidator.validateAmount('100.50');
+    expect(result, isNull);
+  });
+  
+  test('should return error for invalid amount', () {
+    final result = TransactionValidator.validateAmount('-50');
+    expect(result, isNotNull);
+    expect(result, contains('Invalid amount'));
+  });
+  
+  test('should return error for empty amount', () {
+    final result = TransactionValidator.validateAmount('');
+    expect(result, isNotNull);
+    expect(result, contains('Amount is required'));
+  });
+});
+```
+
+### Code Organization
+```dart
+// ✅ Good: Proper file structure
+// 1. Imports (Dart, Flutter, Third-party, Local)
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../domain/entities/transaction.dart';
+
+// 2. Main widget
+class TransactionList extends StatelessWidget {
+  const TransactionList({super.key});
+  
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<TransactionBloc, TransactionState>(
+      builder: (context, state) {
+        return _buildContent(context, state);
+      },
+    );
+  }
+}
+
+// 3. Private widgets
+class _TransactionListContent extends StatelessWidget {
+  const _TransactionListContent({required this.transactions});
+  
+  final List<Transaction> transactions;
+  
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      itemCount: transactions.length,
+      itemBuilder: (context, index) => TransactionListItem(
+        transaction: transactions[index],
+      ),
+    );
+  }
+}
+
+// 4. Helper methods
+Widget _buildContent(BuildContext context, TransactionState state) {
+  return state.when(
+    loading: () => const CircularProgressIndicator(),
+    loaded: (transactions) => _TransactionListContent(transactions: transactions),
+    error: (message) => Text('Error: $message'),
+  );
+}
+```
+
+Refer to these patterns for writing clean, maintainable, and testable Dart code.
+# Dart Best Practices & SOLID Principles
+
+## Object-Oriented Programming & SOLID Principles
+
+### Single Responsibility Principle (SRP)
+```dart
+// ✅ Good: Each class has one responsibility
+class TransactionValidator {
+  static String? validateAmount(String? value) {
+    if (value == null || value.isEmpty) return 'Amount is required';
+    final amount = double.tryParse(value);
+    if (amount == null || amount <= 0) return 'Invalid amount';
+    return null;
+  }
+}
+
+class TransactionCalculator {
+  static double calculateTotal(List<Transaction> transactions) {
+    return transactions.fold(0.0, (sum, transaction) => sum + transaction.amount);
+  }
+}
+
+// ❌ Bad: Multiple responsibilities
+class TransactionManager {
+  void validateAmount() { /* validation logic */ }
+  void calculateTotal() { /* calculation logic */ }
+  void saveToDatabase() { /* database logic */ }
+}
+```
+
+### Open/Closed Principle (OCP)
+```dart
+// ✅ Good: Open for extension, closed for modification
+abstract class PaymentMethod {
+  double calculateFee(double amount);
+}
+
+class CreditCardPayment implements PaymentMethod {
+  @override
+  double calculateFee(double amount) => amount * 0.03;
+}
+
+class BankTransferPayment implements PaymentMethod {
+  @override
+  double calculateFee(double amount) => amount * 0.01;
+}
+
+class PaymentProcessor {
+  double processPayment(PaymentMethod method, double amount) {
+    return method.calculateFee(amount);
+  }
+}
+```
+
+### Liskov Substitution Principle (LSP)
+```dart
+// ✅ Good: Subtypes are substitutable
+abstract class Repository<T> {
+  Future<List<T>> getAll();
+  Future<T?> getById(String id);
+  Future<void> save(T item);
+}
+
+class TransactionRepository implements Repository<Transaction> {
+  @override
+  Future<List<Transaction>> getAll() async {
+    // Implementation
+  }
+  
+  @override
+  Future<Transaction?> getById(String id) async {
+    // Implementation
+  }
+  
+  @override
+  Future<void> save(Transaction item) async {
+    // Implementation
+  }
+}
+```
+
+### Interface Segregation Principle (ISP)
+```dart
+// ✅ Good: Specific interfaces
+abstract class ReadableRepository<T> {
+  Future<List<T>> getAll();
+  Future<T?> getById(String id);
+}
+
+abstract class WritableRepository<T> {
+  Future<void> save(T item);
+  Future<void> delete(String id);
+}
+
+abstract class TransactionRepository extends ReadableRepository<Transaction>, WritableRepository<Transaction> {}
+
+// ❌ Bad: Fat interface
+abstract class Repository<T> {
+  Future<List<T>> getAll();
+  Future<T?> getById(String id);
+  Future<void> save(T item);
+  Future<void> delete(String id);
+  Future<void> update(T item);
+  Future<void> clear();
+  Future<int> count();
+}
+```
+
+### Dependency Inversion Principle (DIP)
+```dart
+// ✅ Good: Depend on abstractions
+class WealthBloc extends Bloc<WealthEvent, WealthState> {
+  final WealthRepository _repository; // Abstract dependency
+  
+  WealthBloc(this._repository) : super(WealthInitial());
+}
+
+// ❌ Bad: Depend on concrete implementations
+class WealthBloc extends Bloc<WealthEvent, WealthState> {
+  final FirebaseWealthRepository _repository; // Concrete dependency
+  
+  WealthBloc(this._repository) : super(WealthInitial());
+}
+```
+
+## Dart Language Best Practices
+
+### Immutability with Freezed
+```dart
+@freezed
+class Transaction with _$Transaction {
+  const factory Transaction({
+    required String id,
+    required double amount,
+    required String description,
+    required DateTime date,
+    required TransactionType type,
+    String? category,
+  }) = _Transaction;
+  
+  factory Transaction.fromJson(Map<String, dynamic> json) => _$TransactionFromJson(json);
+}
+```
+
+### Null Safety
+```dart
+// ✅ Good: Explicit null handling
+class UserProfile {
+  final String name;
+  final String? avatarUrl; // Explicit nullable
+  
+  const UserProfile({
+    required this.name,
+    this.avatarUrl,
+  });
+  
+  String get displayName => name;
+  String get avatarDisplayUrl => avatarUrl ?? 'default_avatar.png';
+}
+
+// ❌ Bad: Implicit null handling
+class UserProfile {
+  final String name;
+  final String avatarUrl; // Could be null but not marked
+  
+  const UserProfile({
+    required this.name,
+    this.avatarUrl, // Should be nullable
+  });
+}
+```
+
+### Extension Methods
+```dart
+// ✅ Good: Extend existing types
+extension DateTimeExtension on DateTime {
+  bool get isToday {
+    final now = DateTime.now();
+    return year == now.year && month == now.month && day == now.day;
+  }
+  
+  bool get isThisMonth {
+    final now = DateTime.now();
+    return year == now.year && month == now.month;
+  }
+}
+
+extension StringExtension on String {
+  double? get toDoubleOrNull => double.tryParse(this);
+  
+  bool get isValidAmount {
+    final amount = double.tryParse(this);
+    return amount != null && amount > 0;
+  }
+}
+```
+
+### Async/Await Best Practices
+```dart
+// ✅ Good: Proper error handling
+class TransactionService {
+  Future<Result<List<Transaction>>> getTransactions() async {
+    try {
+      final transactions = await _repository.getTransactions();
+      return Success(transactions);
+    } on NetworkException catch (e) {
+      return Failure('Network error: ${e.message}');
+    } on DatabaseException catch (e) {
+      return Failure('Database error: ${e.message}');
+    }
+  }
+}
+
+// ❌ Bad: Swallowing exceptions
+class TransactionService {
+  Future<List<Transaction>> getTransactions() async {
+    try {
+      return await _repository.getTransactions();
+    } catch (e) {
+      return []; // Swallowing exception
+    }
+  }
+}
+```
+
+### Collection Operations
+```dart
+// ✅ Good: Functional programming with collections
+class TransactionAnalyzer {
+  double calculateTotalIncome(List<Transaction> transactions) {
+    return transactions
+        .where((t) => t.type == TransactionType.income)
+        .map((t) => t.amount)
+        .fold(0.0, (sum, amount) => sum + amount);
+  }
+  
+  Map<String, double> groupByCategory(List<Transaction> transactions) {
+    return transactions
+        .groupBy((t) => t.category ?? 'Uncategorized')
+        .map((category, transactions) => MapEntry(
+              category,
+              transactions.map((t) => t.amount).fold(0.0, (sum, amount) => sum + amount),
+            ));
+  }
+}
+```
+
+### Const Constructors
+```dart
+// ✅ Good: Immutable widgets
+class TransactionCard extends StatelessWidget {
+  const TransactionCard({
+    super.key,
+    required this.transaction,
+    required this.onTap,
+  });
+  
+  final Transaction transaction;
+  final VoidCallback onTap;
+  
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        title: Text(transaction.description),
+        subtitle: Text(transaction.date.toString()),
+        trailing: Text('₽${transaction.amount}'),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+```
+
+### Named Parameters
+```dart
+// ✅ Good: Clear and readable
+class Transaction {
+  const Transaction({
+    required this.id,
+    required this.amount,
+    required this.description,
+    required this.date,
+    this.category,
+    this.notes,
+  });
+  
+  final String id;
+  final double amount;
+  final String description;
+  final DateTime date;
+  final String? category;
+  final String? notes;
+}
+
+// ❌ Bad: Positional parameters for complex objects
+class Transaction {
+  const Transaction(this.id, this.amount, this.description, this.date, this.category, this.notes);
+  
+  final String id;
+  final double amount;
+  final String description;
+  final DateTime date;
+  final String? category;
+  final String? notes;
+}
+```
+
+### Arrow Syntax
+```dart
+// ✅ Good: Use arrow syntax for simple functions
+class TransactionUtils {
+  static bool isValidAmount(double amount) => amount > 0;
+  
+  static String formatCurrency(double amount) => '₽${amount.toStringAsFixed(2)}';
+  
+  static DateTime getStartOfMonth(DateTime date) => DateTime(date.year, date.month, 1);
+}
+
+// ❌ Bad: Verbose syntax for simple functions
+class TransactionUtils {
+  static bool isValidAmount(double amount) {
+    return amount > 0;
+  }
+  
+  static String formatCurrency(double amount) {
+    return '₽${amount.toStringAsFixed(2)}';
+  }
+}
+```
+
+### Expression Bodies
+```dart
+// ✅ Good: Expression bodies for simple getters
+class Transaction {
+  const Transaction({
+    required this.amount,
+    required this.type,
+  });
+  
+  final double amount;
+  final TransactionType type;
+  
+  bool get isIncome => type == TransactionType.income;
+  bool get isExpense => type == TransactionType.expense;
+  String get formattedAmount => '₽${amount.toStringAsFixed(2)}';
+}
+
+// ❌ Bad: Verbose getters
+class Transaction {
+  const Transaction({
+    required this.amount,
+    required this.type,
+  });
+  
+  final double amount;
+  final TransactionType type;
+  
+  bool get isIncome {
+    return type == TransactionType.income;
+  }
+  
+  bool get isExpense {
+    return type == TransactionType.expense;
+  }
+}
+```
+
+### Trailing Commas
+```dart
+// ✅ Good: Trailing commas for better diffs
+class TransactionCard extends StatelessWidget {
+  const TransactionCard({
+    super.key,
+    required this.transaction,
+    required this.onTap,
+    this.showDetails = false,
+  });
+
+  final Transaction transaction;
+  final VoidCallback onTap;
+  final bool showDetails;
+}
+
+// ❌ Bad: No trailing commas
+class TransactionCard extends StatelessWidget {
+  const TransactionCard({
+    super.key,
+    required this.transaction,
+    required this.onTap,
+    this.showDetails = false
+  });
+
+  final Transaction transaction;
+  final VoidCallback onTap;
+  final bool showDetails;
+}
+```
+
+### Error Handling Patterns
+```dart
+// ✅ Good: Result pattern for error handling
+sealed class Result<T> {
+  const Result();
+}
+
+class Success<T> extends Result<T> {
+  final T data;
+  const Success(this.data);
+}
+
+class Failure<T> extends Result<T> {
+  final String message;
+  const Failure(this.message);
+}
+
+// Usage
+class TransactionRepository {
+  Future<Result<List<Transaction>>> getTransactions() async {
+    try {
+      final transactions = await _dataSource.getTransactions();
+      return Success(transactions);
+    } catch (e) {
+      return Failure('Failed to load transactions: $e');
+    }
+  }
+}
+```
+
+### Testing Best Practices
+```dart
+// ✅ Good: Proper test structure
+group('TransactionValidator', () {
+  test('should return null for valid amount', () {
+    final result = TransactionValidator.validateAmount('100.50');
+    expect(result, isNull);
+  });
+  
+  test('should return error for invalid amount', () {
+    final result = TransactionValidator.validateAmount('-50');
+    expect(result, isNotNull);
+    expect(result, contains('Invalid amount'));
+  });
+  
+  test('should return error for empty amount', () {
+    final result = TransactionValidator.validateAmount('');
+    expect(result, isNotNull);
+    expect(result, contains('Amount is required'));
+  });
+});
+```
+
+### Code Organization
+```dart
+// ✅ Good: Proper file structure
+// 1. Imports (Dart, Flutter, Third-party, Local)
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../domain/entities/transaction.dart';
+
+// 2. Main widget
+class TransactionList extends StatelessWidget {
+  const TransactionList({super.key});
+  
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<TransactionBloc, TransactionState>(
+      builder: (context, state) {
+        return _buildContent(context, state);
+      },
+    );
+  }
+}
+
+// 3. Private widgets
+class _TransactionListContent extends StatelessWidget {
+  const _TransactionListContent({required this.transactions});
+  
+  final List<Transaction> transactions;
+  
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      itemCount: transactions.length,
+      itemBuilder: (context, index) => TransactionListItem(
+        transaction: transactions[index],
+      ),
+    );
+  }
+}
+
+// 4. Helper methods
+Widget _buildContent(BuildContext context, TransactionState state) {
+  return state.when(
+    loading: () => const CircularProgressIndicator(),
+    loaded: (transactions) => _TransactionListContent(transactions: transactions),
+    error: (message) => Text('Error: $message'),
+  );
+}
+```
+
+Refer to these patterns for writing clean, maintainable, and testable Dart code.

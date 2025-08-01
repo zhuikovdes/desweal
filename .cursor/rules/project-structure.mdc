@@ -1,0 +1,72 @@
+# DESWEAL Project Structure Guide
+
+This Flutter project follows Clean Architecture principles and is organized as follows:
+
+## Main Entry Point
+- [main.dart](mdc:lib/main.dart) - Application entry point with Firebase initialization
+
+## Core Layer
+- **Dependency Injection**: [injectable.dart](mdc:lib/core/di/injectable.dart), [injectable.config.dart](mdc:lib/core/di/injectable.config.dart)
+- **Localization**: [app_localizations.dart](mdc:lib/core/l10n/app_localizations.dart)
+- **Routing**: [app_router.dart](mdc:lib/core/router/app_router.dart)
+- **Theming**: [app_theme.dart](mdc:lib/core/theme/app_theme.dart)
+- **Constants**: [app_constants.dart](mdc:lib/core/constants/app_constants.dart)
+- **Utils**: [app_utils.dart](mdc:lib/core/utils/app_utils.dart)
+
+## Features Layer
+Features are organized using Clean Architecture with domain, data, and presentation layers:
+
+### Wealth Management Feature
+- **Domain Layer** (Business Logic):
+  - Entities: [transaction.dart](mdc:lib/features/wealth_management/domain/entities/transaction.dart), [wealth_scheme.dart](mdc:lib/features/wealth_management/domain/entities/wealth_scheme.dart), [savings_goal.dart](mdc:lib/features/wealth_management/domain/entities/savings_goal.dart)
+  - Repositories: [wealth_repository.dart](mdc:lib/features/wealth_management/domain/repositories/wealth_repository.dart)
+  - Use Cases: [get_transactions.dart](mdc:lib/features/wealth_management/domain/usecases/get_transactions.dart), [add_transaction.dart](mdc:lib/features/wealth_management/domain/usecases/add_transaction.dart)
+
+- **Data Layer** (Data Sources):
+  - Remote: [firebase_wealth_datasource.dart](mdc:lib/features/wealth_management/data/datasources/firebase_wealth_datasource.dart)
+  - Local: [local_wealth_datasource.dart](mdc:lib/features/wealth_management/data/datasources/local_wealth_datasource.dart)
+  - Models: [transaction_model.dart](mdc:lib/features/wealth_management/data/models/transaction_model.dart)
+  - Repository Implementation: [wealth_repository_impl.dart](mdc:lib/features/wealth_management/data/repositories/wealth_repository_impl.dart)
+
+- **Presentation Layer** (UI):
+  - **Bloc**: [wealth_bloc.dart](mdc:lib/features/wealth_management/presentation/bloc/wealth_bloc.dart), [wealth_event.dart](mdc:lib/features/wealth_management/presentation/bloc/wealth_event.dart), [wealth_state.dart](mdc:lib/features/wealth_management/presentation/bloc/wealth_state.dart)
+  - **Screens**: 
+    - [home_screen.dart](mdc:lib/features/wealth_management/presentation/screens/home_screen.dart)
+    - [add_transaction_screen.dart](mdc:lib/features/wealth_management/presentation/screens/add_transaction_screen.dart)
+    - [settings_screen.dart](mdc:lib/features/wealth_management/presentation/screens/settings_screen.dart)
+    - [statistics_screen.dart](mdc:lib/features/wealth_management/presentation/screens/statistics_screen.dart)
+    - [goals_screen.dart](mdc:lib/features/wealth_management/presentation/screens/goals_screen.dart)
+  - **Widgets**: 
+    - [balance_summary.dart](mdc:lib/features/wealth_management/presentation/widgets/balance_summary.dart)
+    - [transaction_list.dart](mdc:lib/features/wealth_management/presentation/widgets/transaction_list.dart)
+    - [transaction_list_item.dart](mdc:lib/features/wealth_management/presentation/widgets/transaction_list_item.dart)
+    - [wealth_summary.dart](mdc:lib/features/wealth_management/presentation/widgets/wealth_summary.dart)
+    - [income_distribution_card.dart](mdc:lib/features/wealth_management/presentation/widgets/income_distribution_card.dart)
+    - [savings_goal_card.dart](mdc:lib/features/wealth_management/presentation/widgets/savings_goal_card.dart)
+
+### Authentication Feature
+- **Domain**: [auth_repository.dart](mdc:lib/features/auth/domain/repositories/auth_repository.dart)
+- **Data**: [firebase_auth_datasource.dart](mdc:lib/features/auth/data/datasources/firebase_auth_datasource.dart)
+- **Presentation**: [auth_bloc.dart](mdc:lib/features/auth/presentation/bloc/auth_bloc.dart), [login_screen.dart](mdc:lib/features/auth/presentation/screens/login_screen.dart)
+
+## Shared Components
+- **UI Components**: [lib/shared/widgets/](mdc:lib/shared/widgets/)
+- **Models**: [lib/shared/models/](mdc:lib/shared/models/)
+- **Utils**: [lib/shared/utils/](mdc:lib/shared/utils/)
+
+## Configuration Files
+- [pubspec.yaml](mdc:pubspec.yaml) - Dependencies and assets
+- [analysis_options.yaml](mdc:analysis_options.yaml) - Dart analysis rules
+- [firebase_options.dart](mdc:lib/firebase_options.dart) - Firebase configuration
+
+## Key Architectural Principles
+1. **Clean Architecture**: Separation of concerns with domain, data, and presentation layers
+2. **Feature-based Organization**: Each feature is self-contained with its own layers
+3. **Dependency Injection**: Using get_it for service locator pattern
+4. **State Management**: Bloc pattern for complex state, Cubit for simple state
+5. **Repository Pattern**: Abstract data access through repository interfaces
+
+Refer to this rule for an overview of the main code structure and file locations.
+
+Refer to this rule for an overview of the main code structure and file locations.
+
